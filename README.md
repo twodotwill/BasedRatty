@@ -76,6 +76,60 @@ Requirements:
 cargo install --git https://github.com/orhun/ratty
 ```
 
+### macOS app bundle
+
+To get a clickable `Ratty.app` in your Applications folder (launchable from Spotlight, Launchpad, and Finder), build the release binary and wrap it in a bundle:
+
+```bash
+# 1. Build the optimized binary (Bevy + fat LTO — this takes a while)
+cargo build --release
+
+# 2. Create the .app skeleton
+APP="Ratty.app"
+rm -rf "$APP"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+cp target/release/ratty "$APP/Contents/MacOS/ratty"
+
+# 3. Convert the bundled icon to .icns
+ICONSET="$(mktemp -d)/ratty.iconset"; mkdir -p "$ICONSET"
+sips -s format png assets/ratty.ico --out /tmp/ratty.png >/dev/null
+for s in 16 32 128 256 512; do
+  sips -z $s $s        /tmp/ratty.png --out "$ICONSET/icon_${s}x${s}.png"    >/dev/null
+  sips -z $((s*2)) $((s*2)) /tmp/ratty.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/ratty.icns"
+
+# 4. Write Info.plist
+cat > "$APP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key><string>Ratty</string>
+	<key>CFBundleDisplayName</key><string>Ratty</string>
+	<key>CFBundleIdentifier</key><string>dev.orhun.ratty</string>
+	<key>CFBundleVersion</key><string>0.4.1</string>
+	<key>CFBundleShortVersionString</key><string>0.4.1</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleExecutable</key><string>ratty</string>
+	<key>CFBundleIconFile</key><string>ratty.icns</string>
+	<key>LSMinimumSystemVersion</key><string>11.0</string>
+	<key>NSHighResolutionCapable</key><true/>
+	<key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
+</dict>
+</plist>
+PLIST
+
+# 5. Ad-hoc codesign so Gatekeeper allows launch, then install
+codesign --force --deep --sign - "$APP"
+cp -R "$APP" /Applications/
+```
+
+> [!NOTE]
+> The bundle is ad-hoc signed (not notarized). If macOS blocks the first launch, right-click the app and choose **Open** once, or run `xattr -dr com.apple.quarantine /Applications/Ratty.app`.
+>
+> The bundled app uses Ratty's built-in defaults unless you copy a config file to `$HOME/.config/ratty/ratty.toml`. The built-in window opacity is `0.8`, matching Ghostty's `background-opacity = 0.8`.
+
 ## Configuration
 
 The default configuration file is available in [`config/ratty.toml`](config/ratty.toml).
@@ -115,6 +169,10 @@ Other useful cursor fields are:
 | ----------------------------------------------- | -------------------- |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>     | Copy selection       |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>V</kbd>     | Paste clipboard      |
+| <kbd>Command</kbd>+<kbd>C</kbd>                 | Copy selection       |
+| <kbd>Command</kbd>+<kbd>V</kbd>                 | Paste clipboard      |
+| <kbd>Command</kbd>+<kbd>Q</kbd>                 | Quit                 |
+| <kbd>Command</kbd>+<kbd>W</kbd>                 | Close window         |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Enter</kbd> | Toggle 2D / 3D mode  |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd>     | Toggle Mobius mode   |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Up</kbd>    | Increase warp        |
@@ -126,6 +184,9 @@ Other useful cursor fields are:
 | <kbd>Ctrl</kbd>+<kbd>=</kbd>                    | Increase font size   |
 | <kbd>Ctrl</kbd>+<kbd>-</kbd>                    | Decrease font size   |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>0</kbd>     | Reset font size      |
+| <kbd>Command</kbd>+<kbd>=</kbd>                 | Increase font size   |
+| <kbd>Command</kbd>+<kbd>-</kbd>                 | Decrease font size   |
+| <kbd>Command</kbd>+<kbd>0</kbd>                 | Reset font size      |
 
 ## Inline 3D objects
 

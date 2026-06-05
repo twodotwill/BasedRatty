@@ -17,9 +17,9 @@ scrollback = 2000
 TERM = "xterm-256color"
 
 [font]
-family = "DejaVu Sans Mono"
+family = "SF Mono"
 style = "Regular"
-size = 18
+size = 13
 
 [cursor.model]
 path = "CairoSpinyMouse.obj"
@@ -38,6 +38,10 @@ bob_amplitude = 0.08
 keys = [
   { key = "C", with = "Control | alt", action = "Copy" },
   { key = "V", with = "Control | alt", action = "Paste" },
+  { key = "C", with = "Command", action = "Copy" },
+  { key = "V", with = "Command", action = "Paste" },
+  { key = "Q", with = "Command", action = "Quit" },
+  { key = "W", with = "Command", action = "Quit" },
   { key = "PageUp", with = "alt", action = "ScrollPageUp" },
   { key = "PageDown", with = "alt", action = "ScrollPageDown" },
   { key = "Up", with = "alt", action = "ScrollUp" },
@@ -45,6 +49,9 @@ keys = [
   { key = "Equal", with = "Control", action = "IncreaseFontSize" },
   { key = "Minus", with = "Control", action = "DecreaseFontSize" },
   { key = "Digit0", with = "Control | alt", action = "ResetFontSize" },
+  { key = "Equal", with = "Command", action = "IncreaseFontSize" },
+  { key = "Minus", with = "Command", action = "DecreaseFontSize" },
+  { key = "Digit0", with = "Command", action = "ResetFontSize" },
   { key = "Enter", with = "Control | alt", action = "Toggle3DMode" },
   { key = "M", with = "Control | alt", action = "ToggleMobiusMode" },
   { key = "Up", with = "Control | alt", action = "IncreaseWarp" },

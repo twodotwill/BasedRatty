@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use bevy::asset::AssetPlugin;
 use bevy::prelude::*;
-use bevy::window::{PrimaryWindow, WindowCreated, WindowResolution};
+use bevy::window::{CompositeAlphaMode, PrimaryWindow, WindowCreated, WindowResolution};
 use bevy::winit::{UpdateMode, WINIT_WINDOWS, WinitSettings};
 use clap::Parser;
 
@@ -38,7 +38,7 @@ fn main() -> anyhow::Result<()> {
         &app_config,
         &RuntimeOptions {
             command: cli.command.clone(),
-            working_dir: Some(std::env::current_dir()?),
+            working_dir: default_working_dir()?,
         },
     )?;
     let terminal = TerminalSurface::new(&app_config)?;
@@ -46,13 +46,16 @@ fn main() -> anyhow::Result<()> {
     let asset_root = runtime_asset_root();
     std::fs::create_dir_all(&asset_root)?;
     let window_icon = load_window_icon()?;
+    let window_opacity = app_config.window.opacity.clamp(0.0, 1.0);
+    let window_transparent = window_opacity < 1.0;
+    let clear_alpha = if window_opacity < 1.0 { 0 } else { 255 };
 
     App::new()
         .insert_resource(ClearColor(Color::srgba_u8(
             app_config.theme.background[0],
             app_config.theme.background[1],
             app_config.theme.background[2],
-            (app_config.window.opacity.clamp(0.0, 1.0) * 255.0).round() as u8,
+            clear_alpha,
         )))
         .insert_resource(app_config.clone())
         .insert_non_send_resource(runtime)
@@ -73,7 +76,12 @@ fn main() -> anyhow::Result<()> {
                             app_config.window.height,
                         )
                         .with_scale_factor_override(app_config.window.scale_factor),
-                        transparent: app_config.window.opacity < 1.0,
+                        composite_alpha_mode: if window_transparent {
+                            CompositeAlphaMode::PostMultiplied
+                        } else {
+                            CompositeAlphaMode::Auto
+                        },
+                        transparent: window_transparent,
                         visible: false,
                         ..default()
                     }),
@@ -89,6 +97,18 @@ fn main() -> anyhow::Result<()> {
         .run();
 
     Ok(())
+}
+
+fn default_working_dir() -> anyhow::Result<Option<std::path::PathBuf>> {
+    let exe = std::env::current_exe()?;
+    if exe
+        .components()
+        .any(|component| component.as_os_str().to_string_lossy().ends_with(".app"))
+    {
+        Ok(None)
+    } else {
+        Ok(Some(std::env::current_dir()?))
+    }
 }
 
 /// Applies the platform window icon after winit creates the native window.

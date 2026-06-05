@@ -139,7 +139,7 @@ impl Default for WindowConfig {
             width: 960,
             height: 620,
             scale_factor: 1.0,
-            opacity: 1.0,
+            opacity: 0.8,
         }
     }
 }
@@ -232,6 +232,9 @@ pub enum BindingAction {
     /// Pastes clipboard contents.
     #[serde(rename = "Paste")]
     Paste,
+    /// Exits the application.
+    #[serde(rename = "Quit")]
+    Quit,
     /// Increases the font size.
     #[serde(rename = "IncreaseFontSize")]
     IncreaseFontSize,
@@ -258,9 +261,9 @@ pub struct FontConfig {
 impl Default for FontConfig {
     fn default() -> Self {
         Self {
-            family: "DejaVu Sans Mono".to_string(),
+            family: "SF Mono".to_string(),
             style: FontStyleConfig::Regular,
-            size: 18,
+            size: 13,
         }
     }
 }

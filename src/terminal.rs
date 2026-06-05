@@ -18,6 +18,8 @@ use crate::mouse::TerminalSelection;
 
 /// Minimum interval between terminal redraws.
 const REDRAW_THROTTLE: Duration = Duration::from_millis(16);
+const MIN_FONT_SIZE: i32 = 6;
+const MAX_FONT_SIZE: i32 = 96;
 
 /// Terminal redraw flag.
 #[derive(Resource)]
@@ -66,7 +68,9 @@ pub struct TerminalSurface {
     pub rows: u16,
     cursor_model_visible: bool,
     window_opacity: f32,
+    background_rgb: [u8; 3],
     font: FontConfig,
+    initial_font_size: i32,
     theme: ThemeConfig,
     renderer: TerminalRenderer,
     gpu: Option<OffscreenGpu>,
@@ -151,7 +155,9 @@ impl TerminalSurface {
             rows,
             cursor_model_visible: config.cursor.model.visible,
             window_opacity: config.window.opacity.clamp(0.0, 1.0),
+            background_rgb: config.theme.background,
             font: config.font.clone(),
+            initial_font_size: config.font.size,
             theme: config.theme.clone(),
             renderer,
             gpu: None,
@@ -160,7 +166,7 @@ impl TerminalSurface {
 
     /// Adjusts the font size.
     pub fn adjust_font_size(&mut self, delta: i32) -> bool {
-        let new_size = self.font.size + delta;
+        let new_size = (self.font.size + delta).clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);
         if new_size == self.font.size {
             return false;
         }
@@ -179,6 +185,11 @@ impl TerminalSurface {
     /// Returns the current font size.
     pub fn font_size(&self) -> i32 {
         self.font.size
+    }
+
+    /// Returns the font size loaded from configuration.
+    pub fn initial_font_size(&self) -> i32 {
+        self.initial_font_size
     }
 
     /// Resizes the terminal grid.
@@ -278,11 +289,33 @@ impl TerminalSurface {
             data.resize(target_len, 0);
         }
         if gpu.rgba.len() == target_len {
+            apply_background_opacity(&mut gpu.rgba, self.background_rgb, self.window_opacity);
             data.copy_from_slice(&gpu.rgba);
         }
 
         Ok(())
     }
+}
+
+fn apply_background_opacity(rgba: &mut [u8], background_rgb: [u8; 3], opacity: f32) {
+    let alpha = (opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
+    if alpha == 255 {
+        return;
+    }
+
+    for pixel in rgba.chunks_exact_mut(4) {
+        if rgb_is_background(pixel, background_rgb) {
+            pixel[3] = alpha;
+        }
+    }
+}
+
+fn rgb_is_background(pixel: &[u8], background_rgb: [u8; 3]) -> bool {
+    const TOLERANCE: u8 = 2;
+    pixel[..3]
+        .iter()
+        .zip(background_rgb)
+        .all(|(channel, background)| channel.abs_diff(background) <= TOLERANCE)
 }
 
 fn build_terminal_renderer(

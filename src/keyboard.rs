@@ -8,7 +8,10 @@ use bevy::prelude::*;
 
 use arboard::Clipboard;
 
-use crate::config::{AppConfig, BindingAction, FontConfig, KeyBindingConfig};
+use bevy::app::AppExit;
+use bevy::ecs::message::MessageWriter;
+
+use crate::config::{AppConfig, BindingAction, KeyBindingConfig};
 use crate::mouse::{TerminalSelection, encode_mouse_wheel};
 use crate::runtime::TerminalRuntime;
 use crate::scene::{
@@ -136,6 +139,14 @@ impl FromWorld for TerminalKeyBindings {
                 BindingAction::Copy,
             ),
             KeyBinding::new(
+                KeyCode::KeyC,
+                BindingModifiers {
+                    super_key: true,
+                    ..default()
+                },
+                BindingAction::Copy,
+            ),
+            KeyBinding::new(
                 KeyCode::KeyV,
                 BindingModifiers {
                     control: true,
@@ -145,9 +156,41 @@ impl FromWorld for TerminalKeyBindings {
                 BindingAction::Paste,
             ),
             KeyBinding::new(
+                KeyCode::KeyV,
+                BindingModifiers {
+                    super_key: true,
+                    ..default()
+                },
+                BindingAction::Paste,
+            ),
+            KeyBinding::new(
+                KeyCode::KeyQ,
+                BindingModifiers {
+                    super_key: true,
+                    ..default()
+                },
+                BindingAction::Quit,
+            ),
+            KeyBinding::new(
+                KeyCode::KeyW,
+                BindingModifiers {
+                    super_key: true,
+                    ..default()
+                },
+                BindingAction::Quit,
+            ),
+            KeyBinding::new(
                 KeyCode::Equal,
                 BindingModifiers {
                     control: true,
+                    ..default()
+                },
+                BindingAction::IncreaseFontSize,
+            ),
+            KeyBinding::new(
+                KeyCode::Equal,
+                BindingModifiers {
+                    super_key: true,
                     ..default()
                 },
                 BindingAction::IncreaseFontSize,
@@ -161,9 +204,25 @@ impl FromWorld for TerminalKeyBindings {
                 BindingAction::IncreaseFontSize,
             ),
             KeyBinding::new(
+                KeyCode::NumpadAdd,
+                BindingModifiers {
+                    super_key: true,
+                    ..default()
+                },
+                BindingAction::IncreaseFontSize,
+            ),
+            KeyBinding::new(
                 KeyCode::Minus,
                 BindingModifiers {
                     control: true,
+                    ..default()
+                },
+                BindingAction::DecreaseFontSize,
+            ),
+            KeyBinding::new(
+                KeyCode::Minus,
+                BindingModifiers {
+                    super_key: true,
                     ..default()
                 },
                 BindingAction::DecreaseFontSize,
@@ -177,10 +236,34 @@ impl FromWorld for TerminalKeyBindings {
                 BindingAction::DecreaseFontSize,
             ),
             KeyBinding::new(
+                KeyCode::NumpadSubtract,
+                BindingModifiers {
+                    super_key: true,
+                    ..default()
+                },
+                BindingAction::DecreaseFontSize,
+            ),
+            KeyBinding::new(
                 KeyCode::Digit0,
                 BindingModifiers {
                     control: true,
                     alt: true,
+                    ..default()
+                },
+                BindingAction::ResetFontSize,
+            ),
+            KeyBinding::new(
+                KeyCode::Digit0,
+                BindingModifiers {
+                    super_key: true,
+                    ..default()
+                },
+                BindingAction::ResetFontSize,
+            ),
+            KeyBinding::new(
+                KeyCode::Numpad0,
+                BindingModifiers {
+                    super_key: true,
                     ..default()
                 },
                 BindingAction::ResetFontSize,
@@ -316,6 +399,7 @@ pub struct KeyboardSystemParams<'w, 's> {
     clipboard: NonSendMut<'w, TerminalClipboard>,
     runtime: NonSendMut<'w, TerminalRuntime>,
     terminal: NonSendMut<'w, TerminalSurface>,
+    app_exit: MessageWriter<'w, AppExit>,
     viewport: Res<'w, TerminalViewport>,
     bindings: Res<'w, TerminalKeyBindings>,
     redraw: ResMut<'w, TerminalRedrawState>,
@@ -464,6 +548,10 @@ pub fn handle_keyboard_input(
                     }
                     continue;
                 }
+                BindingAction::Quit => {
+                    params.app_exit.write(AppExit::Success);
+                    continue;
+                }
                 BindingAction::IncreaseFontSize
                 | BindingAction::DecreaseFontSize
                 | BindingAction::ResetFontSize => {
@@ -471,7 +559,7 @@ pub fn handle_keyboard_input(
                         BindingAction::IncreaseFontSize => params.terminal.adjust_font_size(1),
                         BindingAction::DecreaseFontSize => params.terminal.adjust_font_size(-1),
                         BindingAction::ResetFontSize => {
-                            let target = FontConfig::default().size;
+                            let target = params.terminal.initial_font_size();
                             let delta = target - params.terminal.font_size();
                             delta != 0 && params.terminal.adjust_font_size(delta)
                         }

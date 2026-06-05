@@ -273,7 +273,6 @@ pub fn setup_scene(
 
     let mut sprite = Sprite::from_image(image_handle);
     sprite.custom_size = Some(viewport_size);
-    sprite.color = Color::srgba(1.0, 1.0, 1.0, terminal_opacity);
     commands.spawn((
         TerminalSprite,
         sprite,
@@ -292,7 +291,7 @@ pub fn setup_scene(
         TerminalPlane,
         Mesh3d(front_mesh),
         MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgba(1.0, 1.0, 1.0, terminal_opacity),
+            base_color: Color::WHITE,
             base_color_texture: terminal.image_handle.clone(),
             alpha_mode: AlphaMode::Blend,
             unlit: true,
@@ -306,7 +305,7 @@ pub fn setup_scene(
         TerminalPlaneBack,
         Mesh3d(back_mesh),
         MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgba(1.0, 1.0, 1.0, terminal_opacity),
+            base_color: Color::WHITE,
             base_color_texture: terminal.back_image_handle.clone(),
             alpha_mode: AlphaMode::Blend,
             unlit: true,

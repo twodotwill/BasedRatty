@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::env;
 use std::io::{ErrorKind, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -279,14 +279,14 @@ impl TerminalRuntime {
             let mut cmd = CommandBuilder::new(program);
             cmd.args(command);
             cmd
+        } else if let Some(program) = config.shell.program.as_ref() {
+            let mut cmd = CommandBuilder::new(program);
+            cmd.args(&config.shell.args);
+            cmd
+        } else if config.shell.args.is_empty() {
+            CommandBuilder::new_default_prog()
         } else {
-            let shell = config
-                .shell
-                .program
-                .as_ref()
-                .map(|path| path.to_string_lossy().into_owned())
-                .or_else(|| env::var("SHELL").ok())
-                .unwrap_or_else(default_shell);
+            let shell = env::var("SHELL").unwrap_or_else(|_| default_shell());
             let mut cmd = CommandBuilder::new(shell);
             cmd.args(&config.shell.args);
             cmd
@@ -295,6 +295,7 @@ impl TerminalRuntime {
         if let Some(working_dir) = &options.working_dir {
             cmd.cwd(working_dir);
         }
+        apply_platform_environment_defaults(&mut cmd, config);
         if !config.env.contains_key("TERM") {
             cmd.env("TERM", "xterm-256color");
         }
@@ -385,4 +386,69 @@ impl TerminalRuntime {
     pub fn modify_other_keys(&self) -> Option<u8> {
         self.parser.callbacks().modify_other_keys()
     }
+}
+
+fn apply_platform_environment_defaults(cmd: &mut CommandBuilder, config: &AppConfig) {
+    #[cfg(target_os = "macos")]
+    apply_macos_environment_defaults(cmd, config);
+
+    #[cfg(not(target_os = "macos"))]
+    let _ = (cmd, config);
+}
+
+#[cfg(target_os = "macos")]
+fn apply_macos_environment_defaults(cmd: &mut CommandBuilder, config: &AppConfig) {
+    if config.shell.program.is_none()
+        && !config.env.contains_key("SHELL")
+        && env::var_os("SHELL").is_none()
+        && let Some(shell) = macos_user_shell()
+    {
+        cmd.env("SHELL", shell);
+    }
+
+    if !config.env.contains_key("PATH") {
+        let path = env::var("PATH").unwrap_or_default();
+        if path.is_empty() || !path.split(':').any(|entry| entry == "/opt/homebrew/bin") {
+            cmd.env(
+                "PATH",
+                "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+            );
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_user_shell() -> Option<String> {
+    env::var("SHELL")
+        .ok()
+        .filter(|shell| Path::new(shell).is_file())
+        .or_else(|| {
+            std::process::Command::new("/usr/bin/dscl")
+                .args([".", "-read", &format!("/Users/{}", whoami()), "UserShell"])
+                .output()
+                .ok()
+                .filter(|output| output.status.success())
+                .and_then(|output| String::from_utf8(output.stdout).ok())
+                .and_then(|stdout| {
+                    stdout
+                        .split_whitespace()
+                        .last()
+                        .filter(|shell| shell.starts_with('/'))
+                        .map(str::to_owned)
+                })
+        })
+}
+
+#[cfg(target_os = "macos")]
+fn whoami() -> String {
+    env::var("USER").unwrap_or_else(|_| {
+        std::process::Command::new("/usr/bin/id")
+            .arg("-un")
+            .output()
+            .ok()
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| "unknown".to_string())
+    })
 }
